@@ -38,7 +38,7 @@ async function saveToken(token) {
 
 async function handleLogin() {
     const answers = await inquirer.prompt([
-        { type: 'input', name: 'username', message: 'Enter login:' },
+        { type: 'input', name: 'username', message: 'Enter username:' },
         { type: 'password', name: 'password', message: 'Enter password:', mask: '•' }
     ]);
     try {
@@ -54,7 +54,7 @@ async function handleLogin() {
 
 async function handleRegister() {
     const answers = await inquirer.prompt([
-        { type: 'input', name: 'username', message: 'Create a login:' },
+        { type: 'input', name: 'username', message: 'Create a username:' },
         { type: 'password', name: 'password', message: 'Create a password:', mask: '•' }
     ]);
     try {
@@ -71,7 +71,7 @@ function startLocalServer(token) {
     const app = express();
 
     app.get('/', (req, res) => {
-        res.send(getHtmlInterface());
+        res.send(getHtmlInterface(API_BASE_URL));
     });
 
     app.get('/get-token', (req, res) => {
@@ -95,7 +95,7 @@ function startLocalServer(token) {
 }
 
 async function main() {
-    console.log('\x1b[35m%s\x1b[0m', '--- WFLY Messenger Client v3.7 ---');
+    console.log('\x1b[35m%s\x1b[0m', '--- WFLY Messenger Client v4.6 ---');
     await ensureSessionDir();
     let token = await getToken();
 
@@ -125,7 +125,7 @@ async function main() {
     startLocalServer(token);
 }
 
-function getHtmlInterface() {
+function getHtmlInterface(apiBaseUrl) {
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -133,22 +133,23 @@ function getHtmlInterface() {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WFLY Messenger</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         :root {
-            --bg-main: #11101d;
-            --bg-sidebar: #1d1b31;
-            --bg-content: #11101d;
-            --bg-input: #2a2d3e;
-            --bg-hover: #2a2d3e;
-            --primary-accent: #8e44ad;
-            --primary-accent-hover: #9b59b6;
+            --bg-main: #0e1621;
+            --bg-sidebar: #17212b;
+            --bg-content: #0e1621;
+            --bg-input: #243447;
+            --bg-hover: #2a3b4c;
+            --primary-accent: #5288c1;
+            --primary-accent-hover: #639cd1;
             --text-main: #e0e0e0;
-            --text-secondary: #a0a0b0;
+            --text-secondary: #8a9ba8;
             --text-title: #ffffff;
-            --border-color: #2a2d3e;
-            --online-color: #2ecc71;
-            --typing-color: #3498db;
+            --border-color: #243447;
+            --online-color: #4ec95d;
+            --typing-color: #5288c1;
             --error-color: #e74c3c;
             --font-main: 'Inter', sans-serif;
         }
@@ -161,119 +162,117 @@ function getHtmlInterface() {
             overflow: hidden;
         }
         #app-container { display: flex; height: 100vh; }
+
         #sidebar {
-            width: 320px;
+            width: 340px;
             background-color: var(--bg-sidebar);
             display: flex;
             flex-direction: column;
             border-right: 1px solid var(--border-color);
-            transition: width 0.3s ease;
         }
         .sidebar-header {
-            padding: 20px;
+            padding: 10px 15px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid var(--border-color);
+            gap: 15px;
         }
-        .sidebar-header h2 { font-size: 24px; color: var(--text-title); }
-        #search-user-btn {
+        #settings-btn, #search-user-btn {
             background: none; border: none; cursor: pointer; color: var(--text-secondary);
-            padding: 5px; border-radius: 50%; transition: background-color 0.2s, color 0.2s;
+            padding: 8px; border-radius: 50%; transition: background-color 0.2s, color 0.2s;
         }
-        #search-user-btn:hover { background-color: var(--bg-hover); color: var(--text-main); }
+        #settings-btn:hover, #search-user-btn:hover { background-color: var(--bg-hover); color: white; }
+        #search-chats-input {
+            flex-grow: 1;
+            padding: 8px 15px;
+            border-radius: 20px;
+            border: none;
+            background-color: var(--bg-input);
+            color: var(--text-main);
+            outline: none;
+        }
         #chat-list { flex-grow: 1; overflow-y: auto; }
         .chat-item {
-            display: flex; align-items: center; padding: 15px 20px;
+            display: flex; align-items: center; padding: 10px 15px;
             cursor: pointer; transition: background-color 0.2s;
             border-bottom: 1px solid var(--border-color);
         }
         .chat-item:hover { background-color: var(--bg-hover); }
         .chat-item.active { background-color: var(--primary-accent); }
-        .chat-item .avatar {
-            width: 48px; height: 48px; border-radius: 50%;
+        .avatar {
+            width: 50px; height: 50px; border-radius: 50%;
             background-color: var(--primary-accent);
             display: flex; align-items: center; justify-content: center;
-            font-weight: 600; font-size: 20px; color: white;
+            font-weight: 600; font-size: 22px; color: white;
             margin-right: 15px;
+            background-size: cover;
+            background-position: center;
+            flex-shrink: 0;
         }
-        .chat-item .chat-info { flex-grow: 1; }
+        .chat-item .chat-info { flex-grow: 1; overflow: hidden; }
         .chat-item .partner-name { font-weight: 600; color: var(--text-title); }
-        .chat-item .partner-status { 
-            font-size: 12px; color: var(--text-secondary); 
-            display: flex; align-items: center;
+        .chat-item .last-message { 
+            font-size: 14px; color: var(--text-secondary); 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .status-indicator {
-            width: 8px; height: 8px; border-radius: 50%;
-            margin-right: 6px; transition: background-color 0.3s;
-        }
-        .status-indicator.online { background-color: var(--online-color); }
-        .status-indicator.offline { background-color: var(--text-secondary); }
-        .sidebar-footer {
-            padding: 15px 20px; border-top: 1px solid var(--border-color);
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 13px; color: var(--text-secondary);
-        }
-        .sidebar-footer .error { color: var(--error-color); }
-        #language-selector {
-            background-color: var(--bg-input);
-            color: var(--text-main);
-            border: 1px solid var(--border-color);
-            border-radius: 5px;
-            padding: 4px 8px;
-            outline: none;
-        }
-        #main-content { flex-grow: 1; display: flex; flex-direction: column; }
+        .last-message.typing { color: var(--typing-color); font-style: italic; }
+        
+        #main-content { flex-grow: 1; display: flex; flex-direction: column; background-image: url('https://i.imgur.com/E39S2vI.png'); }
         #welcome-screen {
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             height: 100%; text-align: center; padding: 20px;
         }
-        #welcome-screen svg { width: 80px; height: 80px; color: var(--primary-accent); margin-bottom: 20px;}
-        #welcome-screen h2 { font-size: 28px; margin-bottom: 10px; color: var(--text-title); }
+        #welcome-screen .welcome-box { background-color: rgba(23, 33, 43, 0.8); padding: 30px; border-radius: 10px; }
+        #welcome-screen h2 { font-size: 24px; margin-bottom: 10px; color: var(--text-title); }
         #chat-window { display: flex; flex-direction: column; height: 100%; }
         #chat-header {
-            padding: 15px 25px; background-color: var(--bg-sidebar);
+            padding: 10px 15px; background-color: var(--bg-sidebar);
             border-bottom: 1px solid var(--border-color);
-            display: flex; align-items: center;
+            display: flex; align-items: center; cursor: pointer;
         }
-        #chat-partner-name { font-size: 18px; font-weight: 600; }
-        #chat-partner-status { margin-left: auto; font-size: 14px; color: var(--text-secondary); }
-        #chat-partner-status.typing { color: var(--typing-color); }
+        #chat-header .avatar { margin-right: 10px; width: 40px; height: 40px; font-size: 18px; }
+        #chat-header-info { display: flex; flex-direction: column; }
+        #chat-partner-name { font-size: 16px; font-weight: 600; }
+        #chat-partner-status-header { font-size: 13px; color: var(--text-secondary); transition: color 0.2s; }
+        #chat-partner-status-header.online, #chat-partner-status-header.typing { color: var(--primary-accent); }
+        
         #message-list {
-            flex-grow: 1; padding: 25px; overflow-y: auto;
-            display: flex; flex-direction: column; gap: 15px;
+            flex-grow: 1; padding: 20px; overflow-y: auto;
+            display: flex; flex-direction: column; gap: 5px;
         }
         .message {
-            max-width: 70%; padding: 12px 18px; border-radius: 20px;
-            line-height: 1.5; animation: pop-in 0.3s ease;
+            max-width: 65%; padding: 8px 15px; border-radius: 18px;
+            line-height: 1.5; margin-bottom: 2px;
+            word-wrap: break-word;
+            animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        @keyframes pop-in { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes pop-in { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .message.sent {
-            background-color: var(--primary-accent); align-self: flex-end;
-            border-bottom-right-radius: 5px; color: white;
+            background-color: var(--primary-accent); color: white;
+            align-self: flex-end; border-bottom-right-radius: 5px;
         }
         .message.received {
-            background-color: var(--bg-input); align-self: flex-start;
-            border-bottom-left-radius: 5px;
+            background-color: var(--bg-sidebar);
+            align-self: flex-start; border-bottom-left-radius: 5px;
         }
+        
         #chat-footer {
-            padding: 20px 25px; border-top: 1px solid var(--border-color);
+            padding: 10px 20px; background-color: var(--bg-sidebar);
         }
         #message-form { display: flex; align-items: center; gap: 15px; }
         #message-input {
-            flex-grow: 1; padding: 14px 20px; border: none;
-            border-radius: 25px; background-color: var(--bg-input);
-            color: var(--text-main); font-size: 16px; outline: none;
-            transition: box-shadow 0.2s;
+            flex-grow: 1; padding: 12px 20px; border: none;
+            border-radius: 20px; background-color: var(--bg-input);
+            color: var(--text-main); font-size: 15px; outline: none;
         }
-        #message-input:focus { box-shadow: 0 0 0 2px var(--primary-accent); }
         #send-btn {
             background-color: var(--primary-accent); color: white;
-            border: none; border-radius: 50%; width: 50px; height: 50px;
+            border: none; border-radius: 50%; width: 44px; height: 44px;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
-            transition: background-color 0.2s;
+            transition: transform 0.2s, background-color 0.2s;
         }
-        #send-btn:hover { background-color: var(--primary-accent-hover); }
+        #send-btn:hover { transform: scale(1.1); }
+        #send-btn:active { transform: scale(0.9); }
+        
         .modal {
             position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center;
@@ -281,67 +280,91 @@ function getHtmlInterface() {
         }
         .modal.visible { opacity: 1; visibility: visible; }
         .modal-content {
-            background-color: var(--bg-sidebar); padding: 30px; border-radius: 12px;
-            width: 90%; max-width: 450px; position: relative;
+            background-color: var(--bg-sidebar); padding: 0; border-radius: 12px;
+            width: 90%; max-width: 400px; position: relative;
             transform: scale(0.9); transition: transform 0.3s;
+            overflow: hidden;
         }
         .modal.visible .modal-content { transform: scale(1); }
-        .close-btn {
-            position: absolute; top: 15px; right: 15px; font-size: 2rem;
-            cursor: pointer; color: var(--text-secondary); transition: color 0.2s;
-        }
-        .close-btn:hover { color: var(--text-main); }
-        #search-form { display: flex; margin: 1rem 0; }
-        #search-input {
-            flex-grow: 1; padding: 12px; border-radius: 8px;
+        .modal-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { color: var(--text-title); }
+        .close-btn { background:none; border:none; font-size: 2rem; cursor: pointer; color: var(--text-secondary); }
+        .modal-body { padding: 0 20px 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-size: 14px; color: var(--text-secondary); }
+        .form-group input, .form-group textarea {
+            width: 100%; padding: 10px; border-radius: 8px;
             border: 1px solid var(--border-color); background-color: var(--bg-input);
-            color: var(--text-main); font-size: 16px;
+            color: var(--text-main); font-size: 15px;
         }
-        #search-results .user-item {
-            padding: 12px; margin-top: 10px; border-radius: 8px;
-            cursor: pointer; background-color: var(--bg-input);
-            transition: background-color 0.2s;
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .file-upload-label {
+            display: block; padding: 10px; border: 2px dashed var(--border-color);
+            border-radius: 8px; text-align: center; cursor: pointer; transition: border-color 0.2s;
         }
-        #search-results .user-item:hover { background-color: var(--primary-accent); }
+        .file-upload-label:hover { border-color: var(--primary-accent); }
+        .modal-footer { padding: 20px; text-align: right; background-color: var(--bg-input); }
+        .btn-primary {
+            padding: 10px 20px; background-color: var(--primary-accent); color: white;
+            border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.2s;
+        }
+        .btn-primary:hover { background-color: var(--primary-accent-hover); }
         .hidden { display: none !important; }
+
+        #avatar-preview, #banner-preview {
+            max-width: 100px; max-height: 100px; border-radius: 50%; margin-top: 10px; object-fit: cover;
+        }
+        #banner-preview { max-width: 100%; border-radius: 8px; }
+        #profile-view-banner {
+            width: 100%; height: 150px; background-size: cover; background-position: center;
+            background-color: var(--primary-accent);
+        }
+        #profile-view-avatar {
+            width: 100px; height: 100px; border-radius: 50%;
+            border: 4px solid var(--bg-sidebar);
+            margin: -50px auto 0;
+            position: relative;
+            background-size: cover; background-position: center;
+        }
+        #profile-view-username { text-align: center; font-size: 22px; font-weight: bold; margin-top: 10px; }
+        #profile-view-bio { text-align: center; color: var(--text-secondary); margin-top: 5px; padding: 0 20px 20px; }
     </style>
 </head>
 <body>
     <div id="app-container">
         <aside id="sidebar">
             <div class="sidebar-header">
-                <h2 data-i18n="chats">Chats</h2>
-                <button id="search-user-btn" data-i18n-title="findUserTitle">
+                <button id="settings-btn" title="Settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                <input type="text" id="search-chats-input" placeholder="Search">
+                 <button id="search-user-btn" title="Find User">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 </button>
             </div>
             <div id="chat-list"></div>
-            <div class="sidebar-footer">
-                <span id="current-user-info" data-i18n="connecting">Connecting...</span>
-                 <select id="language-selector">
-                    <option value="en">English</option>
-                    <option value="ru">Русский</option>
-                    <option value="it">Italiano</option>
-                </select>
-            </div>
         </aside>
         <main id="main-content">
             <div id="welcome-screen">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-                <h2 data-i18n="welcomeTitle">Welcome to WFLY</h2>
-                <p data-i18n="welcomeMessage">Select a chat to start messaging.</p>
+                <div class="welcome-box">
+                    <h2>WFLY Messenger</h2>
+                    <p>Select a chat to start messaging.</p>
+                </div>
             </div>
             <div id="chat-window" class="hidden">
                 <header id="chat-header">
-                    <h3 id="chat-partner-name"></h3>
-                    <span id="chat-partner-status"></span>
+                    <div class="avatar" id="chat-header-avatar"></div>
+                    <div id="chat-header-info">
+                        <h3 id="chat-partner-name"></h3>
+                        <span id="chat-partner-status-header"></span>
+                    </div>
                 </header>
                 <div id="message-list"></div>
                 <footer id="chat-footer">
                     <form id="message-form">
-                        <input type="text" id="message-input" data-i18n-placeholder="messagePlaceholder" autocomplete="off">
-                        <button id="send-btn" type="submit" data-i18n-title="sendTitle">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        <input type="text" id="message-input" placeholder="Message" autocomplete="off">
+                        <button id="send-btn" type="submit" title="Send">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.4-8.4c.8-.4.8-1.6 0-2L3.4 1.6c-.7-.3-1.4.4-1.2 1.2l2.3 7.2H12c.6 0 1 .4 1 1s-.4 1-1 1H4.5l-2.3 7.2c-.2.8.5 1.5 1.2 1.2z"/></svg>
                         </button>
                     </form>
                 </footer>
@@ -351,134 +374,72 @@ function getHtmlInterface() {
 
     <div id="search-modal" class="modal">
         <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2 data-i18n="findUser">Find user</h2>
-            <form id="search-form">
-                <input type="text" id="search-input" data-i18n-placeholder="searchPlaceholder">
-            </form>
-            <div id="search-results"></div>
+             <div class="modal-header"><h2>Find User</h2><button class="close-btn">&times;</button></div>
+             <div class="modal-body">
+                <form id="search-form"><input type="text" id="search-input" placeholder="Enter username..."></form>
+                <div id="search-results"></div>
+             </div>
+        </div>
+    </div>
+    
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Settings</h2><button class="close-btn">&times;</button></div>
+            <div class="modal-body">
+                <form id="profile-form">
+                    <div class="form-group"><label>Banner</label><img id="banner-preview" class="hidden"><label for="profile-banner-input" class="file-upload-label">Click to upload banner</label><input type="file" id="profile-banner-input" accept="image/*" class="hidden"></div>
+                    <div class="form-group"><label>Avatar</label><img id="avatar-preview" class="hidden"><label for="profile-avatar-input" class="file-upload-label">Click to upload avatar</label><input type="file" id="profile-avatar-input" accept="image/*" class="hidden"></div>
+                    <div class="form-group"><label>Username</label><input type="text" id="profile-username" disabled></div>
+                    <div class="form-group"><label>Bio</label><textarea id="profile-bio" placeholder="Write something about yourself..."></textarea></div>
+                </form>
+            </div>
+            <div class="modal-footer"><button type="submit" form="profile-form" class="btn-primary">Save Changes</button></div>
         </div>
     </div>
 
+    <div id="profile-view-modal" class="modal">
+        <div class="modal-content">
+            <div id="profile-view-banner"></div>
+            <div id="profile-view-avatar"></div>
+            <div class="modal-body">
+                <h2 id="profile-view-username"></h2>
+                <p id="profile-view-bio"></p>
+            </div>
+            <div class="modal-footer"><button class="close-btn btn-primary">Close</button></div>
+        </div>
+    </div>
+    
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const i18n = {
-            en: {
-                chats: "Chats",
-                findUserTitle: "Find user",
-                connecting: "Connecting...",
-                welcomeTitle: "Welcome to WFLY",
-                welcomeMessage: "Select a chat to start messaging.",
-                messagePlaceholder: "Enter a message...",
-                sendTitle: "Send",
-                findUser: "Find user",
-                searchPlaceholder: "Enter user login...",
-                connectionErrorToken: "Error getting token.",
-                connectionError: "Connection error. Check the server.",
-                connectionLost: "Connection lost. Reconnecting in {seconds}s...",
-                loggedInAs: "Logged in as: {username}",
-                noChats: "Find a user to start a chat.",
-                online: "Online",
-                offline: "Offline",
-                typing: "typing...",
-                usersNotFound: "Users not found.",
-            },
-            ru: {
-                chats: "Чаты",
-                findUserTitle: "Найти пользователя",
-                connecting: "Подключение...",
-                welcomeTitle: "Добро пожаловать в WFLY",
-                welcomeMessage: "Выберите чат, чтобы начать общение.",
-                messagePlaceholder: "Введите сообщение...",
-                sendTitle: "Отправить",
-                findUser: "Найти пользователя",
-                searchPlaceholder: "Введите логин пользователя...",
-                connectionErrorToken: "Ошибка получения токена.",
-                connectionError: "Ошибка соединения. Проверьте сервер.",
-                connectionLost: "Соединение потеряно. Переподключение через {seconds}с...",
-                loggedInAs: "Вы вошли как: {username}",
-                noChats: "Найдите пользователя, чтобы начать чат.",
-                online: "В сети",
-                offline: "Не в сети",
-                typing: "печатает...",
-                usersNotFound: "Пользователи не найдены.",
-            },
-            it: {
-                chats: "Chat",
-                findUserTitle: "Trova utente",
-                connecting: "Connessione...",
-                welcomeTitle: "Benvenuto in WFLY",
-                welcomeMessage: "Seleziona una chat per iniziare a messaggiare.",
-                messagePlaceholder: "Scrivi un messaggio...",
-                sendTitle: "Invia",
-                findUser: "Trova utente",
-                searchPlaceholder: "Inserisci il login dell'utente...",
-                connectionErrorToken: "Errore nel recupero del token.",
-                connectionError: "Errore di connessione. Controlla il server.",
-                connectionLost: "Connessione persa. Riconnessione in {seconds}s...",
-                loggedInAs: "Accesso come: {username}",
-                noChats: "Trova un utente per avviare una chat.",
-                online: "Online",
-                offline: "Offline",
-                typing: "sta scrivendo...",
-                usersNotFound: "Utenti non trovati.",
-            }
-        };
-
-        let currentLang = localStorage.getItem('wfly-lang') || 'en';
-
-        function translateUI(lang) {
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                if (i18n[lang][key]) {
-                    el.textContent = i18n[lang][key];
-                }
-            });
-             document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-                const key = el.getAttribute('data-i18n-placeholder');
-                if (i18n[lang][key]) {
-                    el.placeholder = i18n[lang][key];
-                }
-            });
-            document.querySelectorAll('[data-i18n-title]').forEach(el => {
-                const key = el.getAttribute('data-i18n-title');
-                if (i18n[lang][key]) {
-                    el.title = i18n[lang][key];
-                }
-            });
-            document.documentElement.lang = lang;
-            renderChatList();
-            updateChatHeaderStatus(state.activeChatId ? state.chats.get(state.activeChatId)?.partnerId : null);
-        }
-
+        const API_BASE_URL = '${apiBaseUrl}';
         const state = {
-            ws: null, token: null, userId: null, username: null,
+            ws: null, token: null, user: null,
             chats: new Map(),
             messages: new Map(),
             activeChatId: null,
             typingTimers: new Map(),
             isUnloading: false, 
-            reconnectDelay: 5000,
-            maxReconnectDelay: 60000
+            reconnectDelay: 1000,
         };
 
-        const chatListEl = document.getElementById('chat-list');
-        const messageListEl = document.getElementById('message-list');
-        const messageForm = document.getElementById('message-form');
-        const messageInput = document.getElementById('message-input');
-        const currentUserInfoEl = document.getElementById('current-user-info');
-        const welcomeScreen = document.getElementById('welcome-screen');
-        const chatWindow = document.getElementById('chat-window');
-        const chatPartnerNameEl = document.getElementById('chat-partner-name');
-        const chatPartnerStatusEl = document.getElementById('chat-partner-status');
-        const languageSelector = document.getElementById('language-selector');
+        const $ = (selector) => document.querySelector(selector);
+        const $$ = (selector) => document.querySelectorAll(selector);
         
-        const searchModal = document.getElementById('search-modal');
-        const searchUserBtn = document.getElementById('search-user-btn');
-        const closeModalBtn = document.querySelector('.close-btn');
-        const searchForm = document.getElementById('search-form');
-        const searchInput = document.getElementById('search-input');
-        const searchResultsEl = document.getElementById('search-results');
+        const apiClient = {
+            async get(endpoint) {
+                return axios.get(\`\${API_BASE_URL}\${endpoint}\`, {
+                    headers: { 'Authorization': \`Bearer \${state.token}\` }
+                });
+            },
+            async updateProfile(formData) {
+                return axios.put(\`\${API_BASE_URL}/profile\`, formData, {
+                    headers: { 
+                        'Authorization': \`Bearer \${state.token}\`,
+                        'Content-Type': 'multipart/form-data'
+                    }
+                });
+            }
+        };
 
         async function connect() {
             try {
@@ -491,39 +452,22 @@ function getHtmlInterface() {
                 state.ws = new WebSocket('wss://api.wfly.me:5542');
                 setupWsEvents();
             } catch (error) {
-                currentUserInfoEl.innerHTML = \`<span class="error">\${i18n[currentLang].connectionErrorToken}</span>\`;
-                console.error('Error getting token:', error);
+                console.error('Connection setup error:', error);
             }
         }
 
         function setupWsEvents() {
             state.ws.onopen = () => {
-                console.log('WebSocket: Connection established.');
-                state.reconnectDelay = 5000;
+                console.log('WebSocket: Connected.');
                 sendMessage({ type: 'auth', payload: { token: state.token } });
             };
-            state.ws.onmessage = (event) => {
-                const message = JSON.parse(event.data);
-                handleServerMessage(message);
-            };
+            state.ws.onmessage = (event) => handleServerMessage(JSON.parse(event.data));
             state.ws.onclose = () => {
-                if (state.isUnloading) {
-                    console.log('WebSocket: Connection closed due to page unload.');
-                    return;
-                }
-                const delaySeconds = state.reconnectDelay / 1000;
-                const message = i18n[currentLang].connectionLost.replace('{seconds}', delaySeconds);
-                console.log(\`WebSocket: Connection closed. Reconnecting in \${delaySeconds}s...\`);
-                currentUserInfoEl.innerHTML = \`<span class="error">\${message}</span>\`;
-                
+                if (state.isUnloading) return;
+                console.log(\`WebSocket: Disconnected. Reconnecting in 1 second...\`);
                 setTimeout(connect, state.reconnectDelay);
-                
-                state.reconnectDelay = Math.min(state.reconnectDelay * 2, state.maxReconnectDelay);
             };
-            state.ws.onerror = (error) => {
-                console.error('WebSocket: Connection error.', error);
-                currentUserInfoEl.innerHTML = \`<span class="error">\${i18n[currentLang].connectionError}</span>\`;
-            };
+            state.ws.onerror = (error) => console.error('WebSocket Error:', error);
         }
 
         function sendMessage(data) {
@@ -535,54 +479,33 @@ function getHtmlInterface() {
         function handleServerMessage({ type, payload }) {
             switch (type) {
                 case 'auth_success':
-                    state.userId = payload.userId;
-                    state.username = payload.username;
-                    currentUserInfoEl.textContent = i18n[currentLang].loggedInAs.replace('{username}', state.username);
+                    state.user = payload;
+                    sendMessage({ type: 'get_chat_list' });
                     break;
                 case 'chat_list':
-                    const newChats = new Map();
                     payload.forEach(chat => {
-                        const existingChat = state.chats.get(chat.chatId);
-                        newChats.set(chat.chatId, { 
-                            ...chat, 
-                            status: existingChat?.status || 'offline',
-                            lastMessageTimestamp: existingChat?.lastMessageTimestamp || null
-                        });
+                        const existing = state.chats.get(chat.chatId);
+                        state.chats.set(chat.chatId, { ...existing, ...chat });
                     });
-                    state.chats = newChats;
                     renderChatList();
                     break;
                 case 'chat_history':
                     state.messages.set(payload.chatId, payload.messages);
-                    if (payload.messages.length > 0) {
-                        const chat = state.chats.get(payload.chatId);
-                        if(chat) {
-                            chat.lastMessageTimestamp = payload.messages[payload.messages.length - 1].timestamp;
-                            renderChatList();
-                        }
-                    }
-                    if (payload.chatId === state.activeChatId) {
-                        renderMessages(payload.chatId);
-                    }
+                    renderMessages(payload.chatId);
                     break;
                 case 'new_message':
-                    if (!state.messages.has(payload.chatId)) {
-                        state.messages.set(payload.chatId, []);
-                    }
+                    if (!state.messages.has(payload.chatId)) state.messages.set(payload.chatId, []);
                     state.messages.get(payload.chatId).push(payload);
-
-                    const chatToUpdate = state.chats.get(payload.chatId);
-                    if (chatToUpdate) {
-                        chatToUpdate.lastMessageTimestamp = payload.timestamp;
-                        renderChatList();
+                    const chat = state.chats.get(payload.chatId);
+                    if (chat) {
+                        chat.lastMessageTimestamp = payload.timestamp;
+                        chat.lastMessage = payload.content;
                     }
-
-                    if (payload.chatId === state.activeChatId) {
-                        appendMessage(payload);
-                    }
+                    renderChatList();
+                    if (payload.chatId === state.activeChatId) appendMessage(payload);
                     break;
                 case 'user_status_update':
-                    updatePartnerStatus(payload.userId, payload.status);
+                    updatePartnerStatus(payload);
                     break;
                 case 'search_results':
                     renderSearchResults(payload);
@@ -591,194 +514,227 @@ function getHtmlInterface() {
         }
 
         function renderChatList() {
-            chatListEl.innerHTML = '';
-            if (state.chats.size === 0) {
-                chatListEl.innerHTML = \`<p style="padding: 20px; text-align: center; color: var(--text-secondary);">\${i18n[currentLang].noChats}</p>\`;
+            const list = $('#chat-list');
+            const sortedChats = Array.from(state.chats.values()).sort((a, b) => 
+                new Date(b.lastMessageTimestamp || 0) - new Date(a.lastMessageTimestamp || 0)
+            );
+
+            list.innerHTML = '';
+            if (sortedChats.length === 0) {
+                list.innerHTML = '<p style="padding: 20px; text-align: center;">No chats yet. Find a user to start!</p>';
                 return;
             }
-            
-            const sortedChats = Array.from(state.chats.values()).sort((a, b) => {
-                const timeA = a.lastMessageTimestamp ? new Date(a.lastMessageTimestamp) : 0;
-                const timeB = b.lastMessageTimestamp ? new Date(b.lastMessageTimestamp) : 0;
-                if (timeB === 0 && timeA === 0) {
-                    return a.partnerUsername.localeCompare(b.partnerUsername);
-                }
-                return timeB - timeA;
-            });
 
             sortedChats.forEach(chat => {
-                const initial = chat.partnerUsername.charAt(0).toUpperCase();
-                const chatItem = document.createElement('div');
-                chatItem.className = 'chat-item';
-                chatItem.dataset.chatId = chat.chatId;
-                if (chat.chatId === state.activeChatId) chatItem.classList.add('active');
+                const item = document.createElement('div');
+                item.className = 'chat-item';
+                item.dataset.chatId = chat.chatId;
+                if (chat.chatId === state.activeChatId) item.classList.add('active');
                 
-                const statusText = chat.status === 'online' ? i18n[currentLang].online : i18n[currentLang].offline;
+                const avatarUrl = chat.partnerAvatar ? \`\${API_BASE_URL}\${chat.partnerAvatar}\` : '';
+                const initial = chat.partnerUsername.charAt(0).toUpperCase();
+                const lastMessage = chat.lastMessage || 'No messages yet...';
 
-                chatItem.innerHTML = \`
-                    <div class="avatar">\${initial}</div>
+                item.innerHTML = \`
+                    <div class="avatar" style="background-image: url('\${avatarUrl}')">\${!avatarUrl ? initial : ''}</div>
                     <div class="chat-info">
                         <div class="partner-name">\${chat.partnerUsername}</div>
-                        <div class="partner-status" data-partner-id="\${chat.partnerId}">
-                            <div class="status-indicator \${chat.status === 'online' ? 'online' : 'offline'}"></div>
-                            <span>\${statusText}</span>
-                        </div>
+                        <div class="last-message" data-partner-id="\${chat.partnerId}">\${lastMessage}</div>
                     </div>
                 \`;
-                chatItem.addEventListener('click', () => selectChat(chat.chatId));
-                chatListEl.appendChild(chatItem);
+                item.addEventListener('click', () => selectChat(chat.chatId));
+                list.appendChild(item);
             });
         }
-
+        
         function selectChat(chatId) {
             state.activeChatId = chatId;
+            $('#welcome-screen').classList.add('hidden');
+            $('#chat-window').classList.remove('hidden');
             renderChatList();
             
-            welcomeScreen.classList.add('hidden');
-            chatWindow.classList.remove('hidden');
-            
             const chat = state.chats.get(chatId);
-            chatPartnerNameEl.textContent = chat.partnerUsername;
+            $('#chat-partner-name').textContent = chat.partnerUsername;
+            
+            const avatarUrl = chat.partnerAvatar ? \`\${API_BASE_URL}\${chat.partnerAvatar}\` : '';
+            const initial = chat.partnerUsername.charAt(0).toUpperCase();
+            $('#chat-header-avatar').style.backgroundImage = \`url('\${avatarUrl}')\`;
+            $('#chat-header-avatar').textContent = !avatarUrl ? initial : '';
+
             updateChatHeaderStatus(chat.partnerId);
-
-            if (state.messages.has(chatId)) {
-                renderMessages(chatId);
-            } else {
-                sendMessage({ type: 'get_history', payload: { chatId } });
-            }
+            
+            sendMessage({ type: 'get_history', payload: { chatId } });
         }
-
+        
         function renderMessages(chatId) {
-            messageListEl.innerHTML = '';
+            const list = $('#message-list');
+            list.innerHTML = '';
             const messages = state.messages.get(chatId) || [];
             messages.forEach(appendMessage);
         }
-
+        
         function appendMessage(msg) {
-            const msgEl = document.createElement('div');
-            msgEl.className = 'message';
-            msgEl.classList.add(msg.senderId === state.userId ? 'sent' : 'received');
-            msgEl.textContent = msg.content;
-            messageListEl.appendChild(msgEl);
-            messageListEl.scrollTop = messageListEl.scrollHeight;
+            const item = document.createElement('div');
+            item.className = \`message \${msg.senderId === state.user.id ? 'sent' : 'received'}\`;
+            item.textContent = msg.content;
+            $('#message-list').appendChild(item);
+            $('#message-list').scrollTop = $('#message-list').scrollHeight;
         }
 
-        function updatePartnerStatus(partnerId, status) {
-            let targetChatId = null;
-            for (const [chatId, chat] of state.chats.entries()) {
-                if (chat.partnerId === partnerId) {
-                    chat.status = status;
-                    targetChatId = chatId;
-                    break;
+        function updatePartnerStatus({ userId, status, chatId }) {
+            const chat = Array.from(state.chats.values()).find(c => c.partnerId === userId);
+            if (chat) {
+                chat.status = status;
+                const statusEl = $(\`.last-message[data-partner-id="\${userId}"]\`);
+                if (statusEl) {
+                    if (status === 'typing') {
+                        statusEl.textContent = 'typing...';
+                        statusEl.classList.add('typing');
+                    } else {
+                        statusEl.textContent = chat.lastMessage || 'No messages yet...';
+                        statusEl.classList.remove('typing');
+                    }
                 }
             }
-            
-            const statusEl = document.querySelector(\`.partner-status[data-partner-id="\${partnerId}"]\`);
-            if (statusEl) {
-                const indicator = statusEl.querySelector('.status-indicator');
-                const text = statusEl.querySelector('span');
-                indicator.className = 'status-indicator';
-                if (status === 'online') {
-                    indicator.classList.add('online');
-                    text.textContent = i18n[currentLang].online;
-                } else if (status === 'offline') {
-                    indicator.classList.add('offline');
-                    text.textContent = i18n[currentLang].offline;
-                }
-            }
-
-            if (state.activeChatId === targetChatId) {
-                updateChatHeaderStatus(partnerId);
+            if (state.activeChatId === chatId) {
+                updateChatHeaderStatus(userId);
             }
         }
-
+        
         function updateChatHeaderStatus(partnerId) {
-            const chat = Array.from(state.chats.values()).find(c => c.partnerId === partnerId);
-            if (!chat) {
-                 chatPartnerStatusEl.textContent = '';
-                 return;
-            }
-
-            chatPartnerStatusEl.classList.remove('typing');
-            if (chat.status === 'typing') {
-                chatPartnerStatusEl.textContent = i18n[currentLang].typing;
-                chatPartnerStatusEl.classList.add('typing');
-            } else if (chat.status === 'online') {
-                chatPartnerStatusEl.textContent = i18n[currentLang].online;
-            } else {
-                chatPartnerStatusEl.textContent = i18n[currentLang].offline;
-            }
+             const chat = Array.from(state.chats.values()).find(c => c.partnerId === partnerId);
+             if (chat) {
+                $('#chat-partner-status-header').textContent = chat.status;
+                $('#chat-partner-status-header').className = \`partner-status \${chat.status}\`;
+             }
         }
 
         function renderSearchResults(users) {
-            searchResultsEl.innerHTML = '';
+            const resultsEl = $('#search-results');
+            resultsEl.innerHTML = '';
             if (users.length === 0) {
-                searchResultsEl.innerHTML = \`<p>\${i18n[currentLang].usersNotFound}</p>\`;
+                resultsEl.innerHTML = '<p>No users found.</p>';
                 return;
             }
             users.forEach(user => {
-                const userItem = document.createElement('div');
-                userItem.className = 'user-item';
-                userItem.textContent = user.username;
-                userItem.addEventListener('click', () => {
+                const item = document.createElement('div');
+                item.className = 'chat-item';
+                const avatarUrl = user.avatar_url ? \`\${API_BASE_URL}\${user.avatar_url}\` : '';
+                const initial = user.username.charAt(0).toUpperCase();
+                item.innerHTML = \`
+                    <div class="avatar" style="background-image: url('\${avatarUrl}')">\${!avatarUrl ? initial : ''}</div>
+                    <div class="chat-info"><div class="partner-name">\${user.username}</div></div>
+                \`;
+                item.onclick = () => {
                     sendMessage({ type: 'start_chat', payload: { userId: user.id } });
-                    searchModal.classList.remove('visible');
-                });
-                searchResultsEl.appendChild(userItem);
+                    $('#search-modal').classList.remove('visible');
+                };
+                resultsEl.appendChild(item);
             });
         }
 
-        messageForm.addEventListener('submit', (e) => {
+        async function openProfileModal(userId) {
+            try {
+                const { data: profile } = await apiClient.get(\`/users/\${userId}\`);
+                $('#profile-view-banner').style.backgroundImage = \`url(\${API_BASE_URL}\${profile.banner_url || ''})\`;
+                const avatarUrl = profile.avatar_url ? \`\${API_BASE_URL}\${profile.avatar_url}\` : '';
+                $('#profile-view-avatar').style.backgroundImage = \`url('\${avatarUrl}')\`;
+                $('#profile-view-username').textContent = profile.username;
+                $('#profile-view-bio').textContent = profile.bio || 'No bio yet.';
+                $('#profile-view-modal').classList.add('visible');
+            } catch (error) {
+                console.error("Failed to load user profile:", error);
+            }
+        }
+        
+        async function openSettingsModal() {
+            try {
+                const { data: profile } = await apiClient.get('/profile');
+                $('#profile-username').value = profile.username;
+                $('#profile-bio').value = profile.bio || '';
+                
+                $('#avatar-preview').classList.toggle('hidden', !profile.avatar_url);
+                if (profile.avatar_url) $('#avatar-preview').src = \`\${API_BASE_URL}\${profile.avatar_url}\`;
+                
+                $('#banner-preview').classList.toggle('hidden', !profile.banner_url);
+                if (profile.banner_url) $('#banner-preview').src = \`\${API_BASE_URL}\${profile.banner_url}\`;
+                
+                $('#settings-modal').classList.add('visible');
+            } catch (error) {
+                console.error("Failed to load profile:", error);
+                alert("Could not load your profile.");
+            }
+        }
+        
+        function handleImagePreview(input, preview) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        $('#settings-btn').addEventListener('click', openSettingsModal);
+        
+        $$('.modal .close-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                btn.closest('.modal').classList.remove('visible');
+            });
+        });
+        
+        $('#search-user-btn').addEventListener('click', () => $('#search-modal').classList.add('visible'));
+        
+        $('#chat-header').addEventListener('click', () => {
+            const chat = state.chats.get(state.activeChatId);
+            if (chat) openProfileModal(chat.partnerId);
+        });
+
+        $('#search-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            const content = messageInput.value.trim();
-            if (content && state.activeChatId) {
-                sendMessage({ type: 'send_message', payload: { chatId: state.activeChatId, content } });
-                sendMessage({ type: 'typing_stop', payload: { chatId: state.activeChatId } });
-                clearTimeout(state.typingTimers.get(state.activeChatId));
-                state.typingTimers.delete(state.activeChatId);
-                messageInput.value = '';
-            }
-        });
-
-        messageInput.addEventListener('input', () => {
-            if (!state.activeChatId) return;
-            if (!state.typingTimers.has(state.activeChatId)) {
-                sendMessage({ type: 'typing_start', payload: { chatId: state.activeChatId } });
-            }
-            clearTimeout(state.typingTimers.get(state.activeChatId));
-            const timer = setTimeout(() => {
-                sendMessage({ type: 'typing_stop', payload: { chatId: state.activeChatId } });
-                state.typingTimers.delete(state.activeChatId);
-            }, 2000);
-            state.typingTimers.set(state.activeChatId, timer);
-        });
-
-        searchUserBtn.addEventListener('click', () => searchModal.classList.add('visible'));
-        closeModalBtn.addEventListener('click', () => searchModal.classList.remove('visible'));
-        searchModal.addEventListener('click', (e) => {
-            if (e.target === searchModal) searchModal.classList.remove('visible');
-        });
-        searchForm.addEventListener('submit', (e) => e.preventDefault());
-        searchInput.addEventListener('input', () => {
-            const query = searchInput.value.trim();
+            const query = $('#search-input').value.trim();
             if (query) sendMessage({ type: 'search_user', payload: { query } });
         });
 
-        languageSelector.addEventListener('change', (e) => {
-            currentLang = e.target.value;
-            localStorage.setItem('wfly-lang', currentLang);
-            translateUI(currentLang);
-        });
+        $('#profile-avatar-input').addEventListener('change', () => handleImagePreview($('#profile-avatar-input'), $('#avatar-preview')));
+        $('#profile-banner-input').addEventListener('change', () => handleImagePreview($('#profile-banner-input'), $('#banner-preview')));
+        
+        $('#profile-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('bio', $('#profile-bio').value);
+            if ($('#profile-avatar-input').files[0]) formData.append('avatar', $('#profile-avatar-input').files[0]);
+            if ($('#profile-banner-input').files[0]) formData.append('banner', $('#profile-banner-input').files[0]);
 
+            try {
+                await apiClient.updateProfile(formData);
+                alert("Profile updated successfully!");
+                $('#settings-modal').classList.remove('visible');
+            } catch (error) {
+                console.error("Profile update failed:", error);
+                alert("Failed to update profile.");
+            }
+        });
+        
+        $('#message-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const content = $('#message-input').value.trim();
+            if (content && state.activeChatId) {
+                sendMessage({ type: 'send_message', payload: { chatId: state.activeChatId, content } });
+                $('#message-input').value = '';
+            }
+        });
+        
         window.addEventListener('beforeunload', () => {
             if (state.ws) {
                 state.isUnloading = true;
                 state.ws.close();
             }
         });
-        
-        languageSelector.value = currentLang;
-        translateUI(currentLang);
+
         connect();
     });
     </script>
