@@ -95,7 +95,7 @@ function startLocalServer(token) {
 }
 
 async function main() {
-    console.log('\x1b[35m%s\x1b[0m', '--- WFLY Messenger Client v4.6 ---');
+    console.log('\x1b[35m%s\x1b[0m', '--- WFLY Messenger Client v5.6 ---');
     await ensureSessionDir();
     let token = await getToken();
 
@@ -151,6 +151,7 @@ function getHtmlInterface(apiBaseUrl) {
             --online-color: #4ec95d;
             --typing-color: #5288c1;
             --error-color: #e74c3c;
+            --success-color: #4ec95d;
             --font-main: 'Inter', sans-serif;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -162,7 +163,6 @@ function getHtmlInterface(apiBaseUrl) {
             overflow: hidden;
         }
         #app-container { display: flex; height: 100vh; }
-
         #sidebar {
             width: 340px;
             background-color: var(--bg-sidebar);
@@ -227,13 +227,16 @@ function getHtmlInterface(apiBaseUrl) {
         #chat-header {
             padding: 10px 15px; background-color: var(--bg-sidebar);
             border-bottom: 1px solid var(--border-color);
-            display: flex; align-items: center; cursor: pointer;
+            display: flex; align-items: center;
         }
+        .chat-header-clickable { cursor: pointer; display: flex; align-items: center; flex-grow: 1; }
         #chat-header .avatar { margin-right: 10px; width: 40px; height: 40px; font-size: 18px; }
         #chat-header-info { display: flex; flex-direction: column; }
         #chat-partner-name { font-size: 16px; font-weight: 600; }
         #chat-partner-status-header { font-size: 13px; color: var(--text-secondary); transition: color 0.2s; }
         #chat-partner-status-header.online, #chat-partner-status-header.typing { color: var(--primary-accent); }
+        #call-btn { margin-left: auto; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 8px; border-radius: 50%; }
+        #call-btn:hover { background-color: var(--bg-hover); color: white; }
         
         #message-list {
             flex-grow: 1; padding: 20px; overflow-y: auto;
@@ -328,6 +331,15 @@ function getHtmlInterface(apiBaseUrl) {
         }
         #profile-view-username { text-align: center; font-size: 22px; font-weight: bold; margin-top: 10px; }
         #profile-view-bio { text-align: center; color: var(--text-secondary); margin-top: 5px; padding: 0 20px 20px; }
+
+        #call-modal { text-align: center; }
+        #call-modal .avatar { margin: 0 auto 15px; width: 80px; height: 80px; font-size: 36px; }
+        #call-modal-status { font-size: 18px; margin: 10px 0; }
+        #call-modal-buttons { display: flex; justify-content: center; gap: 20px; margin-top: 20px; }
+        .call-btn { border: none; width: 60px; height: 60px; border-radius: 50%; cursor: pointer; color: white; transition: opacity 0.2s; }
+        .call-btn:hover { opacity: 0.8; }
+        #accept-call-btn { background-color: var(--success-color); }
+        #decline-call-btn, #end-call-btn { background-color: var(--error-color); }
     </style>
 </head>
 <body>
@@ -353,11 +365,16 @@ function getHtmlInterface(apiBaseUrl) {
             </div>
             <div id="chat-window" class="hidden">
                 <header id="chat-header">
-                    <div class="avatar" id="chat-header-avatar"></div>
-                    <div id="chat-header-info">
-                        <h3 id="chat-partner-name"></h3>
-                        <span id="chat-partner-status-header"></span>
+                    <div class="chat-header-clickable">
+                        <div class="avatar" id="chat-header-avatar"></div>
+                        <div id="chat-header-info">
+                            <h3 id="chat-partner-name"></h3>
+                            <span id="chat-partner-status-header"></span>
+                        </div>
                     </div>
+                    <button id="call-btn" title="Call">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    </button>
                 </header>
                 <div id="message-list"></div>
                 <footer id="chat-footer">
@@ -372,11 +389,12 @@ function getHtmlInterface(apiBaseUrl) {
         </main>
     </div>
 
+    <!-- Modals -->
     <div id="search-modal" class="modal">
         <div class="modal-content">
              <div class="modal-header"><h2>Find User</h2><button class="close-btn">&times;</button></div>
              <div class="modal-body">
-                <form id="search-form"><input type="text" id="search-input" placeholder="Enter username..."></form>
+                <form id="search-form" onsubmit="return false;"><input type="text" id="search-input" placeholder="Enter username..."></form>
                 <div id="search-results"></div>
              </div>
         </div>
@@ -409,6 +427,30 @@ function getHtmlInterface(apiBaseUrl) {
         </div>
     </div>
     
+    <div id="call-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-body" style="padding-top: 20px;">
+                <div class="avatar" id="call-modal-avatar"></div>
+                <h3 id="call-modal-username"></h3>
+                <p id="call-modal-status"></p>
+                <div id="call-modal-buttons">
+                    <button id="accept-call-btn" class="call-btn hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    </button>
+                    <button id="decline-call-btn" class="call-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    </button>
+                     <button id="end-call-btn" class="call-btn hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <audio id="local-audio" autoplay muted></audio>
+    <audio id="remote-audio" autoplay></audio>
+    
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         const API_BASE_URL = '${apiBaseUrl}';
@@ -420,6 +462,10 @@ function getHtmlInterface(apiBaseUrl) {
             typingTimers: new Map(),
             isUnloading: false, 
             reconnectDelay: 1000,
+            peerConnection: null,
+            localStream: null,
+            inCallWith: null,
+            callState: 'idle',
         };
 
         const $ = (selector) => document.querySelector(selector);
@@ -483,26 +529,34 @@ function getHtmlInterface(apiBaseUrl) {
                     sendMessage({ type: 'get_chat_list' });
                     break;
                 case 'chat_list':
+                    const newActiveChat = !state.chats.has(state.activeChatId) && payload.some(c => !state.chats.has(c.chatId));
+                    let newChatToSelect = null;
+
                     payload.forEach(chat => {
                         const existing = state.chats.get(chat.chatId);
+                        if (!existing) newChatToSelect = chat;
                         state.chats.set(chat.chatId, { ...existing, ...chat });
                     });
                     renderChatList();
+                    
+                    if (newActiveChat && newChatToSelect) {
+                        selectChat(newChatToSelect.chatId);
+                    }
                     break;
                 case 'chat_history':
                     state.messages.set(payload.chatId, payload.messages);
                     renderMessages(payload.chatId);
                     break;
                 case 'new_message':
-                    if (!state.messages.has(payload.chatId)) state.messages.set(payload.chatId, []);
-                    state.messages.get(payload.chatId).push(payload);
-                    const chat = state.chats.get(payload.chatId);
+                    if (!state.messages.has(payload.chat_id)) state.messages.set(payload.chat_id, []);
+                    state.messages.get(payload.chat_id).push(payload);
+                    const chat = state.chats.get(payload.chat_id);
                     if (chat) {
                         chat.lastMessageTimestamp = payload.timestamp;
                         chat.lastMessage = payload.content;
                     }
                     renderChatList();
-                    if (payload.chatId === state.activeChatId) appendMessage(payload);
+                    if (payload.chat_id === state.activeChatId) appendMessage(payload);
                     break;
                 case 'user_status_update':
                     updatePartnerStatus(payload);
@@ -510,6 +564,15 @@ function getHtmlInterface(apiBaseUrl) {
                 case 'search_results':
                     renderSearchResults(payload);
                     break;
+                case 'incoming_call': handleIncomingCall(payload); break;
+                case 'call_ringing': updateCallStatus('Ringing...'); break;
+                case 'call_unavailable': updateCallStatus('User is offline.'); setTimeout(endCall, 2000); break;
+                case 'call_accepted': handleCallAccepted(payload); break;
+                case 'call_declined': updateCallStatus('Call declined.'); setTimeout(endCall, 2000); break;
+                case 'call_ended': endCall(); break;
+                case 'webrtc_offer': handleOffer(payload); break;
+                case 'webrtc_answer': handleAnswer(payload); break;
+                case 'webrtc_ice_candidate': handleIceCandidate(payload); break;
             }
         }
 
@@ -575,7 +638,8 @@ function getHtmlInterface(apiBaseUrl) {
         
         function appendMessage(msg) {
             const item = document.createElement('div');
-            item.className = \`message \${msg.senderId === state.user.id ? 'sent' : 'received'}\`;
+            const isSent = state.user && (msg.sender_id === state.user._id);
+            item.className = \`message \${isSent ? 'sent' : 'received'}\`;
             item.textContent = msg.content;
             $('#message-list').appendChild(item);
             $('#message-list').scrollTop = $('#message-list').scrollHeight;
@@ -605,7 +669,7 @@ function getHtmlInterface(apiBaseUrl) {
              const chat = Array.from(state.chats.values()).find(c => c.partnerId === partnerId);
              if (chat) {
                 $('#chat-partner-status-header').textContent = chat.status;
-                $('#chat-partner-status-header').className = \`partner-status \${chat.status}\`;
+                $('#chat-partner-status-header').className = \`last-message \${chat.status}\`;
              }
         }
 
@@ -626,7 +690,7 @@ function getHtmlInterface(apiBaseUrl) {
                     <div class="chat-info"><div class="partner-name">\${user.username}</div></div>
                 \`;
                 item.onclick = () => {
-                    sendMessage({ type: 'start_chat', payload: { userId: user.id } });
+                    sendMessage({ type: 'start_chat', payload: { userId: user._id } });
                     $('#search-modal').classList.remove('visible');
                 };
                 resultsEl.appendChild(item);
@@ -677,7 +741,128 @@ function getHtmlInterface(apiBaseUrl) {
                 reader.readAsDataURL(file);
             }
         }
+        
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
+        async function createPeerConnection(recipientId) {
+            state.peerConnection = new RTCPeerConnection(rtcConfig);
+            state.localStream.getTracks().forEach(track => state.peerConnection.addTrack(track, state.localStream));
+            
+            state.peerConnection.onicecandidate = event => {
+                if (event.candidate) {
+                    sendMessage({ type: 'webrtc_ice_candidate', payload: { candidate: event.candidate, recipientId } });
+                }
+            };
+
+            state.peerConnection.ontrack = event => {
+                $('#remote-audio').srcObject = event.streams[0];
+            };
+        }
+
+        async function startCall() {
+            if (state.callState !== 'idle') return;
+            const chat = state.chats.get(state.activeChatId);
+            if (!chat) return;
+            
+            state.inCallWith = chat.partnerId;
+            state.callState = 'calling';
+            
+            try {
+                state.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                $('#local-audio').srcObject = state.localStream;
+                
+                showCallModal(chat.partnerUsername, chat.partnerAvatar, 'Calling...');
+                $('#accept-call-btn').classList.add('hidden');
+                $('#decline-call-btn').classList.add('hidden');
+                $('#end-call-btn').classList.remove('hidden');
+
+                sendMessage({ type: 'start_call', payload: { calleeId: chat.partnerId } });
+            } catch (err) {
+                console.error("Error accessing media devices.", err);
+                endCall();
+            }
+        }
+
+        function handleIncomingCall({ callerId, username }) {
+            if (state.callState !== 'idle') {
+                sendMessage({ type: 'decline_call', payload: { callerId } });
+                return;
+            }
+            state.inCallWith = callerId;
+            state.callState = 'ringing';
+            
+            const chat = Array.from(state.chats.values()).find(c => c.partnerId === callerId);
+            showCallModal(username, chat?.partnerAvatar, 'Incoming Call...');
+            $('#accept-call-btn').classList.remove('hidden');
+            $('#decline-call-btn').classList.remove('hidden');
+            $('#end-call-btn').classList.add('hidden');
+        }
+        
+        async function handleCallAccepted({ calleeId }) {
+            state.callState = 'connected';
+            await createPeerConnection(calleeId);
+            const offer = await state.peerConnection.createOffer();
+            await state.peerConnection.setLocalDescription(offer);
+            sendMessage({ type: 'webrtc_offer', payload: { offer, recipientId: calleeId } });
+            updateCallStatus('Connected');
+        }
+
+        async function handleOffer({ offer, senderId }) {
+            if (state.callState !== 'connected') return;
+            await createPeerConnection(senderId);
+            await state.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            const answer = await state.peerConnection.createAnswer();
+            await state.peerConnection.setLocalDescription(answer);
+            sendMessage({ type: 'webrtc_answer', payload: { answer, recipientId: senderId } });
+        }
+
+        async function handleAnswer({ answer, senderId }) {
+            if (state.peerConnection) {
+                await state.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            }
+        }
+
+        async function handleIceCandidate({ candidate, senderId }) {
+            if (state.peerConnection) {
+                await state.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            }
+        }
+
+        function endCall() {
+            if (state.inCallWith) {
+                sendMessage({ type: 'end_call', payload: { recipientId: state.inCallWith } });
+            }
+            if (state.peerConnection) {
+                state.peerConnection.close();
+                state.peerConnection = null;
+            }
+            if (state.localStream) {
+                state.localStream.getTracks().forEach(track => track.stop());
+                state.localStream = null;
+            }
+            $('#remote-audio').srcObject = null;
+            $('#local-audio').srcObject = null;
+            state.inCallWith = null;
+            state.callState = 'idle';
+            $('#call-modal').classList.remove('visible');
+        }
+
+        function showCallModal(username, avatarUrl, status) {
+            const initial = username.charAt(0).toUpperCase();
+            const fullAvatarUrl = avatarUrl ? \`\${API_BASE_URL}\${avatarUrl}\` : '';
+            $('#call-modal-avatar').style.backgroundImage = \`url('\${fullAvatarUrl}')\`;
+            $('#call-modal-avatar').textContent = !fullAvatarUrl ? initial : '';
+            $('#call-modal-username').textContent = username;
+            $('#call-modal-status').textContent = status;
+            $('#call-modal').classList.add('visible');
+        }
+        
+        function updateCallStatus(status) {
+            $('#call-modal-status').textContent = status;
+        }
+
+
+        // --- Event Listeners ---
         $('#settings-btn').addEventListener('click', openSettingsModal);
         
         $$('.modal .close-btn').forEach(btn => {
@@ -688,14 +873,14 @@ function getHtmlInterface(apiBaseUrl) {
         
         $('#search-user-btn').addEventListener('click', () => $('#search-modal').classList.add('visible'));
         
-        $('#chat-header').addEventListener('click', () => {
+        $('.chat-header-clickable').addEventListener('click', () => {
             const chat = state.chats.get(state.activeChatId);
             if (chat) openProfileModal(chat.partnerId);
         });
 
-        $('#search-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const query = $('#search-input').value.trim();
+        $('#search-form').addEventListener('submit', (e) => e.preventDefault());
+        $('#search-input').addEventListener('input', (e) => {
+            const query = e.target.value.trim();
             if (query) sendMessage({ type: 'search_user', payload: { query } });
         });
 
@@ -728,6 +913,28 @@ function getHtmlInterface(apiBaseUrl) {
             }
         });
         
+        $('#call-btn').addEventListener('click', startCall);
+        $('#accept-call-btn').addEventListener('click', async () => {
+            state.callState = 'connected';
+            try {
+                state.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                $('#local-audio').srcObject = state.localStream;
+                sendMessage({ type: 'accept_call', payload: { callerId: state.inCallWith } });
+                updateCallStatus('Connected');
+                $('#accept-call-btn').classList.add('hidden');
+                $('#decline-call-btn').classList.add('hidden');
+                $('#end-call-btn').classList.remove('hidden');
+            } catch (err) {
+                console.error("Error accessing media devices.", err);
+                endCall();
+            }
+        });
+        $('#decline-call-btn').addEventListener('click', () => {
+            sendMessage({ type: 'decline_call', payload: { callerId: state.inCallWith } });
+            endCall();
+        });
+        $('#end-call-btn').addEventListener('click', endCall);
+        
         window.addEventListener('beforeunload', () => {
             if (state.ws) {
                 state.isUnloading = true;
@@ -743,4 +950,25 @@ function getHtmlInterface(apiBaseUrl) {
     `;
 }
 
-main();
+
+process.on('uncaughtException', (err) => {
+    console.error('FATAL: An uncaught exception occurred!');
+    console.error(err.stack || err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('FATAL: An unhandled promise rejection occurred!');
+    console.error('Reason:', reason);
+    console.error('Promise:', promise);
+    process.exit(1);
+});
+
+
+try {
+    main();
+} catch (error) {
+    console.error('FATAL: A synchronous error occurred during startup!');
+    console.error(error.stack || error);
+    process.exit(1);
+}
