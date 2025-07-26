@@ -216,7 +216,7 @@ function getHtmlInterface(apiBaseUrl) {
         }
         .last-message.typing { color: var(--typing-color); font-style: italic; }
         
-        #main-content { flex-grow: 1; display: flex; flex-direction: column; background-image: url('https://i.imgur.com/E39S2vI.png'); }
+        #main-content { flex-grow: 1; display: flex; flex-direction: column; background-image: url('https://i.pinimg.com/736x/7c/d8/b1/7cd8b1a4cce2420b4c23ef69c9398e56.jpg'); }
         #welcome-screen {
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             height: 100%; text-align: center; padding: 20px;
